@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mini Study App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f9;
+  margin: 0;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+button.back {
+  align-self: flex-start;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button.back:hover { background: #d32f2f; }
+.card {
+  background: white;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+#studyPage, #examPage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+@media (max-width: 500px) {
+  .card {
+    max-width: 98vw;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  #studyPage, #examPage {
+    padding: 0 2vw;
+  }
+}
+h2 { margin: 10px 0; text-align: center; }
+.word, .synonym, .meaning { margin: 10px 0; text-align: center; font-size: 18px; }
+.meaning { font-size: 16px; color: #555; }
+.meaning.placeholder {
+  color: #888;
+  opacity: 0.75;
+  font-style: italic;
+}
+.study-nav, .exam-nav { width: 100%; display: flex; justify-content: space-between; margin-top: 20px; }
+.study-nav button, .exam-nav button, button.action { width: 48%; padding: 10px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+.study-nav button, button.action { background: #4caf50; color: white; }
+.study-nav button:hover, button.action:hover { background: #45a049; }
+/* Make mode buttons stack vertically and increase their height for mobile */
+.mode-buttons {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+button.mode {
+  background: #2196f3;
+  color: white;
+  width: 100%;
+  margin: 0;
+  height: 56px;
+  font-size: 20px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+button.mode:hover { background: #1976d2; }
+.counter { margin-bottom: 10px; font-size: 14px; color: #333; text-align:center; }
+.progress-container { width: 100%; background: #ddd; border-radius: 6px; overflow: hidden; height: 20px; margin-bottom:10px; }
+.progress-bar { height: 100%; width: 0%; background: #4caf50; text-align:center; color:white; font-size:14px; line-height:20px; }
+.counters { font-size: 14px; margin-bottom:10px; text-align:center; }
+input { padding: 10px; width: 100%; margin-bottom: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<!-- Mode Selection -->
+<div id="modePage" class="card">
+  <h2>Select Mode</h2>
+  <div class="mode-buttons">
+    <button class="mode" onclick="enterStudyMode()">Study Mode</button>
+    <button class="mode" onclick="enterExamMode()">Exam Mode</button>
+  </div>
+</div>
+
+<!-- Study Mode Page -->
+<div id="studyPage" style="display:none; width:100%;">
+  <button class="back" onclick="backToMode()">Back</button>
+  <div class="counter" id="studyCounter">Word 1 of 5</div>
+  <div class="card" id="studyCard">
+    <div class="word" id="studyWord">Word</div>
+    <div class="synonym" id="studySynonym">Synonym</div>
+    <div class="meaning" id="studyMeaning">(Burmese)</div>
+    <div class="study-nav">
+      <button onclick="prevStudy()">&lt; Prev</button>
+      <button onclick="nextStudy()">Next &gt;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exam Mode Page -->
+<div id="examPage" style="display:none; width:100%;">
+  <button class="back" onclick="backToMode()">Back</button>
+
+  <div class="counters" id="counters">Correct: 0 | Wrong: 0</div>
+
+  <div class="card">
+    <div class="word" id="question">Loading...</div>
+    <div class="meaning" id="meaning">(Burmese)</div>
+    <button class="action" onclick="toggleMeaning()">Show/Hide Meaning</button>
+    <input type="text" id="answerInput" placeholder="Type your answer" disabled>
+    <button class="action" onclick="checkAnswer()" disabled>Submit</button>
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<script>
+const questions = [
+  { word: "supply", synonym: "provide", meaning: "ထောက်ပံ့သည်" },
+  { word: "stop from happening", synonym: "prevent", meaning: "တားဆီးသည်" },
+  { word: "method", synonym: "system", meaning: "နည်းလမ်း" },
+  { word: "rotting", synonym: "decaying", meaning: "ပုပ်နေသော" },
+  { word: "spreads", synonym: "scoops", meaning: "ပျံ့နှံ့သည်" },
+  { word: "held", synonym: "stored", meaning: "သိုလှောင်ထားသည်" },
+  {
+    word: "channels in the earth",
+    synonym: "gullies",
+    meaning: "မြေဆီလွှာတွင်းလမ်းကြောင်းများ",
+  },
+  {
+    word: "the bringing back to a usable condition",
+    synonym: "reclamation",
+    meaning: "ပြန်လည်ထိန်းသိမ်းခြင်း",
+  },
+  { word: "used for", synonym: "devoted to", meaning: "အသုံးပြုသည်" },
+  {
+    word: "keep in existence",
+    synonym: "conserve",
+    meaning: "ထိန်းသိမ်းထားသည်",
+  },
+  { word: "called", synonym: "known as", meaning: "ခေါ်သည်" },
+  { word: "descriptions", synonym: "accounts", meaning: "ဖော်ပြချက်များ" },
+  { word: "mixed", synonym: "mingled", meaning: "ရောနှောထားသော" },
+  {
+    word: "the holy separate hairs",
+    synonym: "sacred strands of hairs",
+    meaning: "သန့်ရှင်းသောဆံပင်များ",
+  },
+  { word: "given", synonym: "presented", meaning: "ပေးအပ်ခဲ့သည်" },
+  { word: "place", synonym: "site", meaning: "နေရာ" },
+  { word: "helped", synonym: "aided", meaning: "ကူညီခဲ့သည်" },
+  {
+    word: "that had existed before",
+    synonym: "preceding",
+    meaning: "အရင်ကရှိခဲ့သော",
+  },
+  { word: "top", synonym: "tip", meaning: "ထိပ်" },
+  { word: "makes up", synonym: "forms", meaning: "ဖွဲ့စည်းသည်" },
+  {
+    word: "moved farther away",
+    synonym: "receded",
+    meaning: "အဝေးသို့ဆွဲထွက်သွားသည်",
+  },
+  { word: "region", synonym: "district", meaning: "ဒေသ" },
+  { word: "small area of land", synonym: "patch", meaning: "မြေပြင်အနည်းငယ်" },
+  { word: "increasing", synonym: "extending", meaning: "တိုးချဲ့ခြင်း" },
+  { word: "power", synonym: "authority", meaning: "အာဏာ" },
+  { word: "capture", synonym: "seize", meaning: "ဖမ်းဆီးသည်" },
+  { word: "in addition to", synonym: "besides", meaning: "အပြင်" },
+  { word: "group of houses", synonym: "settlement", meaning: "နေအိမ်စု" },
+  { word: "unimportant", synonym: "insignificant", meaning: "အရေးမကြီးသော" },
+  { word: "made beautiful", synonym: "decorated", meaning: "အလှဆင်ထားသော" },
+  { word: "covered with gold", synonym: "gilded", meaning: "ရွှေဖုံးထားသော" },
+  { word: "obtained", synonym: "achieved", meaning: "ရရှိခဲ့သည်" },
+  { word: "importance", synonym: "significance", meaning: "အရေးကြီးမှု" },
+  {
+    word: "not very big but very small",
+    synonym: "fair",
+    meaning: "အသင့်အတင့်",
+  },
+  { word: "in the direction of", synonym: "towards", meaning: "သို့" },
+  { word: "most beautiful", synonym: "fairest", meaning: "အလှဆုံး" },
+  {
+    word: "surface of the land",
+    synonym: "land surface",
+    meaning: "မြေပြင်မျက်နှာပြင်",
+  },
+  { word: "areas", synonym: "regions", meaning: "ဒေသများ" },
+  {
+    word: "made up mainly",
+    synonym: "composed chiefly",
+    meaning: "အဓိက ဖွဲ့စည်းထားသည်",
+  },
+  {
+    word: "that has to be continued for a long time",
+    synonym: "sustained",
+    meaning: "ကြာရှည်စွာ ဆက်လက်လုပ်ဆောင်သည့်",
+  },
+  {
+    word: "did not have the ability to continue to do something",
+    synonym: "lacked perseverance",
+    meaning: "စွမ်းအားမရှိခြင်း၊ စောင့်ရှောက်မနိုင်ခြင်း",
+  },
+  { word: "usual", synonym: "customary", meaning: "အမြဲတမ်း ဖြစ်နေကျ" },
+  { word: "border", synonym: "edge", meaning: "နယ်နိမိတ်၊ အနား" },
+  { word: "rest of the snare", synonym: "remaining", meaning: "ကျန်ရှိသော" },
+  {
+    word: "blows",
+    synonym: "impacts",
+    meaning: "အကျိုးသက်ရောက်မှုများ၊ ထိခိုက်မှုများ",
+  },
+  { word: "began", synonym: "started", meaning: "စတင်ခဲ့သည်" },
+  { word: "destroyed", synonym: "consumed", meaning: "ဖျက်ဆီးခဲ့သည်" },
+  { word: "swallowed up", synonym: "engulfed", meaning: "မြုပ်နှံခဲ့သည်" },
+  { word: "falling down", synonym: "collapsing", meaning: "ပေါ်ကျနေသော" },
+  { word: "abilities", synonym: "skills", meaning: "စွမ်းရည်များ" },
+  { word: "happen", synonym: "take place", meaning: "ဖြစ်ပွားသည်" },
+  { word: "seen or heard", synonym: "experienced", meaning: "ကြုံတွေ့ခဲ့သည်" },
+  { word: "kinds", synonym: "forms", meaning: "အမျိုးအစားများ" },
+  { word: "judged", synonym: "considered", meaning: "စဉ်းစားခဲ့သည်" },
+  { word: "joined", synonym: "connected", meaning: "ချိတ်ဆက်ခဲ့သည်" },
+  { word: "need", synonym: "require", meaning: "လိုအပ်သည်" },
+  {
+    word: "in a way that has not been done before",
+    synonym: "original",
+    meaning: "မူရင်း၊ မိမိထူးခြားသော",
+  },
+  {
+    word: "laws and qualities",
+    synonym: "principles",
+    meaning: "စည်းမျဉ်းစည်းကမ်းများ",
+  },
+  { word: "used for", synonym: "applied to", meaning: "အသုံးချသည်" },
+  {
+    word: "that have a practical purpose",
+    synonym: "functional",
+    meaning: "အကျိုးရှိသည့်",
+  },
+  { word: "expression", synonym: "term", meaning: "အသုံးအနှုန်း၊ စကားလုံး" },
+  { word: "actions", synonym: "concerned", meaning: "လုပ်ဆောင်ချက်များ" },
+  { word: "last", synonym: "survive", meaning: "ရှင်သန်ခဲ့သည်" },
+  {
+    word: "opposite to that in which the hands",
+    synonym: "counter-clockwise",
+    meaning: "နာရီလက်တည့်မဲ့ဦးတည်ခြင်း",
+  },
+  {
+    word: "bring into action",
+    synonym: "exerts",
+    meaning: "အသုံးချသည်၊ သုံးစွဲသည်",
+  },
+  { word: "able to be seen", synonym: "visible", meaning: "မြင်နိုင်သော" },
+  { word: "strength", synonym: "intensity", meaning: "တင်းမာမှု၊ အား" },
+  { word: "comes near", synonym: "approaches", meaning: "နီးစပ်လာသည်" },
+  { word: "is made up", synonym: "consists", meaning: "ဖွဲ့စည်းထားသည်" },
+  {
+    word: "very small spot",
+    synonym: "a tiny speck",
+    meaning: "အလွန်သေးငယ်သောအရိပ်",
+  },
+  { word: "turn round", synonym: "rotate", meaning: "လှည့်သည်" },
+  { word: "travel round", synonym: "revolve round", meaning: "လှည့်ပတ်သည်" },
+  {
+    word: "turn round very fast",
+    synonym: "spin",
+    meaning: "လျင်မြန်စွာ လှည့်သည်",
+  },
+  { word: "bordered", synonym: "lined", meaning: "ခြံနယ်များထားသည်" },
+  { word: "full of people", synonym: "crowded", meaning: "လူနည်းမဲ့၊ လူထူသော" },
+  {
+    word: "enough (verb to be + adj)",
+    synonym: "sufficient",
+    meaning: "လုံလောက်သော",
+  },
+  {
+    word: "enough (adv+main verb)",
+    synonym: "sufficiently",
+    meaning: "လုံလောက်စွာ",
+  },
+  { word: "point", synonym: "stage", meaning: "အဆင့်" },
+  { word: "direction", synonym: "course", meaning: "ဦးတည်ချက်" },
+  { word: "immediately", synonym: "directly", meaning: "ချက်ချင်း" },
+  { word: "acted", synonym: "served", meaning: "လုပ်ဆောင်ခဲ့သည်" },
+  { word: "new", synonym: "fresh", meaning: "သစ်သော" },
+  { word: "main", synonym: "leading", meaning: "အဓိက" },
+  {
+    word: "make us able",
+    synonym: "enables",
+    meaning: "ခွင့်ပြုသည်၊ အင်အားပေးသည်",
+  },
+  { word: "effective", synonym: "efficient", meaning: "ထိရောက်သော" },
+  { word: "consider it as true", synonym: "assume", meaning: "ယူဆသည်" },
+  { word: "stays steady", synonym: "remains stable", meaning: "တည်ငြိမ်နေသည်" },
+  { word: "slope", synonym: "lean", meaning: "ထောင့်" },
+  { word: "satisfaction", synonym: "fulfillment", meaning: "ကျေနပ်မှု" },
+  {
+    word: "that is as old as the ages",
+    synonym: "age-old",
+    meaning: "အခေတ်အမျိုးအစားအဟောင်း",
+  },
+  { word: "finished", synonym: "over", meaning: "ပြီးဆုံးသည်" },
+  { word: "drive away", synonym: "banish", meaning: "အပြင်းအထန်သွားပစ်သည်" },
+  {
+    word: "land like a tongue",
+    synonym: "a tongue of land",
+    meaning: "ဧရိယာပုံသဏ္ဍာန် မြေ",
+  },
+  { word: "stretches", synonym: "extends", meaning: "ချဲ့ထွင်သည်" },
+  {
+    word: "region that allow living things to grow well",
+    synonym: "fertile region",
+    meaning: "ပေါက်ပျော်သောဒေသ",
+  },
+  { word: "behave according to", synonym: "respond", meaning: "တုံ့ပြန်သည်" },
+  { word: "about", synonym: "approximately", meaning: "လတ်တလောအနည်းအကျဉ်း" },
+  { word: "were / was", synonym: "existed", meaning: "ရှိခဲ့သည်" },
+  { word: "made up", synonym: "formed", meaning: "ဖွဲ့စည်းထားသည်" },
+  { word: "were made came into", synonym: "existence", meaning: "တည်ရှိလာသည်" },
+  { word: "period", synonym: "time", meaning: "ကာလ" },
+  { word: "changed", synonym: "transformed", meaning: "ပြောင်းလဲသွားသည်" },
+  { word: "very great", synonym: "immense", meaning: "အလွန်ကြီးမားသော" },
+  {
+    word: "break into different parts",
+    synonym: "split",
+    meaning: "ခွဲထွက်သည်",
+  },
+  { word: "broken pieces", synonym: "fragments", meaning: "အစိတ်အပိုင်းများ" },
+  { word: "beginning", synonym: "originating", meaning: "အစပိုင်း" },
+  { word: "started", synonym: "began", meaning: "စတင်ခဲ့သည်" },
+  { word: "rotted", synonym: "decayed", meaning: "ပုပ်နေသော" },
+  { word: "mixed", synonym: "mingled", meaning: "ရောနှောထားသော" },
+  { word: "powder", synonym: "dust", meaning: "မှုန်" },
+  { word: "separate stages", synonym: "by degrees", meaning: "အဆင့်ဆင့်" },
+];
+
+
+// Pages
+const modePage = document.getElementById('modePage');
+const studyPage = document.getElementById('studyPage');
+const examPage = document.getElementById('examPage');
+
+// --- Helper Shuffle ---
+function shuffleArray(arr){ return arr.sort(()=>Math.random()-0.5); }
+
+// --- Study Mode ---
+let studyIndex = 0;
+let shuffledQuestions = [];
+const studyWord = document.getElementById('studyWord');
+const studySynonym = document.getElementById('studySynonym');
+const studyMeaning = document.getElementById('studyMeaning');
+const studyCounter = document.getElementById('studyCounter');
+
+function enterStudyMode(){
+  modePage.style.display='none';
+  studyPage.style.display='block';
+  shuffledQuestions = shuffleArray([...questions]); // shuffle questions
+  studyIndex=0;
+  showStudyItem();
+}
+
+function showStudyItem(){
+  const q = shuffledQuestions[studyIndex];
+  studyWord.textContent = q.word;
+  studySynonym.textContent = q.synonym;
+  studyMeaning.textContent = `(${q.meaning})`;
+  studyCounter.textContent = `Word ${studyIndex+1} of ${shuffledQuestions.length}`;
+}
+
+function nextStudy(){
+  if(studyIndex < shuffledQuestions.length-1){ studyIndex++; showStudyItem(); }
+}
+
+function prevStudy(){
+  if(studyIndex>0){ studyIndex--; showStudyItem(); }
+}
+
+// --- Exam Mode ---
+let examQuestions = [];
+let currentIndex = 0;
+let meaningVisible = false;
+let correctCount = 0;
+let wrongCount = 0;
+
+const questionEl = document.getElementById("question");
+const meaningEl = document.getElementById("meaning");
+const resultEl = document.getElementById("result");
+const answerInput = document.getElementById("answerInput");
+// Progress bar removed
+const countersEl = document.getElementById("counters");
+
+function enterExamMode(){
+  modePage.style.display='none';
+  examPage.style.display='block';
+  startExam();
+}
+
+function startExam(){
+  examQuestions = shuffleArray([...questions]).slice(0,10);
+  currentIndex=0; correctCount=0; wrongCount=0;
+  answerInput.disabled=false;
+  document.querySelector("#examPage button[onclick='checkAnswer()']").disabled=false;
+  loadQuestion();
+}
+
+function loadQuestion(){
+  if(currentIndex >= examQuestions.length){
+    alert(`Exam Completed!\nCorrect: ${correctCount} | Wrong: ${wrongCount}`);
+    return;
+  }
+  const q = examQuestions[currentIndex];
+  questionEl.textContent = `Word: ${q.word}`;
+  if (meaningVisible) {
+    meaningEl.textContent = `(${q.meaning})`;
+    meaningEl.classList.remove('placeholder');
+  } else {
+    meaningEl.textContent = '(Burmese hidden)';
+    meaningEl.classList.add('placeholder');
+  }
+  meaningEl.style.display = 'block';
+  answerInput.value=""; resultEl.textContent="";
+  countersEl.textContent=`Correct: ${correctCount} | Wrong: ${wrongCount}`;
+}
+
+function checkAnswer(){
+  const userAnswer=answerInput.value.trim().toLowerCase();
+  const correctAnswer=examQuestions[currentIndex].synonym.toLowerCase();
+  if(userAnswer===correctAnswer){ resultEl.textContent="✅ Correct!"; resultEl.style.color="green"; correctCount++; }
+  else{ resultEl.textContent=`❌ Wrong! Correct: ${correctAnswer}`; resultEl.style.color="red"; wrongCount++; }
+  setTimeout(()=>{
+    currentIndex++;
+    loadQuestion();
+  },1500);
+}
+
+
+
+function toggleMeaning(){
+  meaningVisible = !meaningVisible;
+  loadQuestion();
+}
+
+// Back to Mode Selection
+function backToMode(){
+  modePage.style.display='flex';
+  studyPage.style.display='none';
+  examPage.style.display='none';
+
+   modePage.style.display='flex';
+  studyPage.style.display='none';
+  examPage.style.display='none';
+
+  // --- Reset Exam Mode ---
+  examQuestions = [];
+  currentIndex = 0;
+  meaningVisible = false;
+  correctCount = 0;
+  wrongCount = 0;
+
+  // Reset UI elements
+  questionEl.textContent = "Press Start to Begin";
+  meaningEl.style.display = "block";
+  meaningEl.textContent = "(Burmese)";
+  answerInput.value = "";
+  answerInput.disabled = true;
+  document.querySelector("#examPage button[onclick='checkAnswer()']").disabled = true;
+  resultEl.textContent = "";
+  // Progress bar reset removed
+  countersEl.textContent = "Correct: 0 | Wrong: 0";
+}
+</script>
+
+</body>
+</html>
